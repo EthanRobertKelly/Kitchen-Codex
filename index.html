@@ -268,7 +268,6 @@ const FIREBASE_CONFIG = {
   }
 
   if (!FIREBASE_CONFIG) {
-    // Config not set yet — use localStorage until Firebase is configured
     window.storage = lsFallback();
     return;
   }
@@ -277,18 +276,20 @@ const FIREBASE_CONFIG = {
     firebase.initializeApp(FIREBASE_CONFIG);
     const db  = firebase.firestore();
     window.db = db;
-    const REF = db.collection('kitchen').doc('recipes');
+    const REF        = db.collection('kitchen').doc('recipes');
+    const PHOTOS_REF = db.collection('kitchen').doc('photos');
 
     window.storage = {
       get: async (k) => {
         try {
-          const snap = await REF.get();
+          const [snap, photoSnap] = await Promise.all([REF.get(), PHOTOS_REF.get()]);
           if (!snap.exists) return { value: null };
           const recipes = JSON.parse(snap.data().value || '[]');
-          // Merge in locally-cached photos (photos don't sync — too large for Firestore)
+          const cloudPhotos = photoSnap.exists ? photoSnap.data() : {};
+          // Merge photos: prefer cloud (synced across devices), fall back to local cache
           recipes.forEach(r => {
-            const p = localStorage.getItem(PHOTO_PREFIX + r.id);
-            if (p) r.photo = p;
+            r.photo = cloudPhotos[r.id] || localStorage.getItem(PHOTO_PREFIX + r.id) || null;
+            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo); // keep local cache warm
           });
           return { value: JSON.stringify(recipes) };
         } catch (e) {
@@ -299,14 +300,20 @@ const FIREBASE_CONFIG = {
       set: async (k, v) => {
         try {
           const recipes = JSON.parse(v);
-          // Strip photos from Firestore payload; cache them locally by recipe id
+          const photos = {};
           const clean = recipes.map(r => {
-            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
+            if (r.photo) {
+              photos[r.id] = r.photo;
+              localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
+            }
             const { photo, ...rest } = r;
             return rest;
           });
-          await REF.set({ value: JSON.stringify(clean) });
-          localStorage.setItem(LS_FALLBACK, v); // local fallback copy
+          await Promise.all([
+            REF.set({ value: JSON.stringify(clean) }),
+            PHOTOS_REF.set(photos)
+          ]);
+          localStorage.setItem(LS_FALLBACK, v);
         } catch (e) {
           console.warn('Firestore write failed, saving to localStorage only', e);
           localStorage.setItem(LS_FALLBACK, v);
@@ -777,6 +784,24 @@ function getEmoji() { const s=document.querySelector('.emoji-opt.selected'); ret
 
 // ── PHOTO UPLOAD ──
 let pendingPhoto = null;
+
+function compressPhoto(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 400;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+      else        { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.70));
+    };
+    img.src = dataUrl;
+  });
+}
+
 function setPhotoPreview(dataUrl) {
   pendingPhoto = dataUrl;
   const drop = document.getElementById('photoDrop');
@@ -794,7 +819,7 @@ function clearPhoto(e) {
 function photoFileChosen(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => setPhotoPreview(e.target.result);
+  reader.onload = async e => setPhotoPreview(await compressPhoto(e.target.result));
   reader.readAsDataURL(file);
   input.value = '';
 }
@@ -806,7 +831,7 @@ function photoDrop(e) {
   const file = e.dataTransfer.files[0];
   if (!file || !file.type.startsWith('image/')) return;
   const reader = new FileReader();
-  reader.onload = ev => setPhotoPreview(ev.target.result);
+  reader.onload = async ev => setPhotoPreview(await compressPhoto(ev.target.result));
   reader.readAsDataURL(file);
 }
 
