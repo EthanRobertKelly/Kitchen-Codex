@@ -276,44 +276,40 @@ const FIREBASE_CONFIG = {
     firebase.initializeApp(FIREBASE_CONFIG);
     const db  = firebase.firestore();
     window.db = db;
-    const REF        = db.collection('kitchen').doc('recipes');
-    const PHOTOS_REF = db.collection('kitchen').doc('photos');
+    const REF = db.collection('kitchen').doc('recipes');
 
     window.storage = {
       get: async (k) => {
         try {
-          const [snap, photoSnap] = await Promise.all([REF.get(), PHOTOS_REF.get()]);
+          const snap = await REF.get();
           if (!snap.exists) return { value: null };
           const recipes = JSON.parse(snap.data().value || '[]');
-          const cloudPhotos = photoSnap.exists ? photoSnap.data() : {};
 
-          // Merge photos: prefer cloud, fall back to local cache
-          const localOnlyPhotos = {};
+          // Merge in any locally-cached photos not yet stored in Firestore
+          let needsSync = false;
           recipes.forEach(r => {
-            const local = localStorage.getItem(PHOTO_PREFIX + r.id);
-            r.photo = cloudPhotos[r.id] || local || null;
-            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
-            // Track photos that exist locally but haven't synced to cloud yet
-            if (local && !cloudPhotos[r.id]) localOnlyPhotos[r.id] = local;
+            if (!r.photo) {
+              const local = localStorage.getItem(PHOTO_PREFIX + r.id);
+              if (local) { r.photo = local; needsSync = true; }
+            } else {
+              localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
+            }
           });
 
-          // Auto-migrate local-only photos to Firestore (runs once per device)
-          if (Object.keys(localOnlyPhotos).length) {
+          // Push local photos up to Firestore so all devices see them
+          if (needsSync) {
             (async () => {
               try {
-                const merged = { ...cloudPhotos };
-                for (const [id, photo] of Object.entries(localOnlyPhotos)) {
-                  // Compress before upload — pre-fix photos may be full-size
-                  const compressed = typeof compressPhoto === 'function'
-                    ? await compressPhoto(photo) : photo;
-                  merged[id] = compressed;
-                  localStorage.setItem(PHOTO_PREFIX + id, compressed);
-                }
-                await PHOTOS_REF.set(merged);
-                console.log(`Migrated ${Object.keys(localOnlyPhotos).length} photo(s) to Firestore.`);
-              } catch (e) {
-                console.warn('Photo migration failed', e);
-              }
+                const synced = await Promise.all(recipes.map(async r => {
+                  if (!r.photo) return r;
+                  const photo = typeof compressPhoto === 'function'
+                    ? await compressPhoto(r.photo) : r.photo;
+                  localStorage.setItem(PHOTO_PREFIX + r.id, photo);
+                  return { ...r, photo };
+                }));
+                await REF.set({ value: JSON.stringify(synced) });
+                console.log('Photos synced to Firestore.');
+              } catch (e) { console.warn('Photo sync failed:', e); }
             })();
           }
 
@@ -325,20 +321,12 @@ const FIREBASE_CONFIG = {
       },
       set: async (k, v) => {
         try {
+          // Photos stored inline — cache locally too
           const recipes = JSON.parse(v);
-          const photos = {};
-          const clean = recipes.map(r => {
-            if (r.photo) {
-              photos[r.id] = r.photo;
-              localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
-            }
-            const { photo, ...rest } = r;
-            return rest;
+          recipes.forEach(r => {
+            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
           });
-          await Promise.all([
-            REF.set({ value: JSON.stringify(clean) }),
-            PHOTOS_REF.set(photos)
-          ]);
+          await REF.set({ value: v });
           localStorage.setItem(LS_FALLBACK, v);
         } catch (e) {
           console.warn('Firestore write failed, saving to localStorage only', e);
@@ -815,14 +803,14 @@ function compressPhoto(dataUrl) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 400;
+      const MAX = 300;
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
       else        { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.70));
+      resolve(canvas.toDataURL('image/jpeg', 0.65));
     };
     img.src = dataUrl;
   });
