@@ -240,6 +240,7 @@ main { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem; }
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script>
 // ── PASTE YOUR FIREBASE CONFIG HERE ─────────────────────────────────────────
 // 1. Go to https://console.firebase.google.com → New project
@@ -257,8 +258,7 @@ const FIREBASE_CONFIG = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 (function () {
-  const PHOTO_PREFIX = 'ek-photo-';
-  const LS_FALLBACK  = 'recipes';
+  const LS_FALLBACK = 'recipes';
 
   function lsFallback() {
     return {
@@ -274,8 +274,9 @@ const FIREBASE_CONFIG = {
 
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
-    const db  = firebase.firestore();
+    const db = firebase.firestore();
     window.db = db;
+    window.fbStorage = firebase.storage();
     const REF = db.collection('kitchen').doc('recipes');
 
     window.storage = {
@@ -283,37 +284,7 @@ const FIREBASE_CONFIG = {
         try {
           const snap = await REF.get();
           if (!snap.exists) return { value: null };
-          const recipes = JSON.parse(snap.data().value || '[]');
-
-          // Merge in any locally-cached photos not yet stored in Firestore
-          let needsSync = false;
-          recipes.forEach(r => {
-            if (!r.photo) {
-              const local = localStorage.getItem(PHOTO_PREFIX + r.id);
-              if (local) { r.photo = local; needsSync = true; }
-            } else {
-              localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
-            }
-          });
-
-          // Push local photos up to Firestore so all devices see them
-          if (needsSync) {
-            (async () => {
-              try {
-                const synced = await Promise.all(recipes.map(async r => {
-                  if (!r.photo) return r;
-                  const photo = typeof compressPhoto === 'function'
-                    ? await compressPhoto(r.photo) : r.photo;
-                  localStorage.setItem(PHOTO_PREFIX + r.id, photo);
-                  return { ...r, photo };
-                }));
-                await REF.set({ value: JSON.stringify(synced) });
-                console.log('Photos synced to Firestore.');
-              } catch (e) { console.warn('Photo sync failed:', e); }
-            })();
-          }
-
-          return { value: JSON.stringify(recipes) };
+          return { value: snap.data().value || '[]' };
         } catch (e) {
           console.warn('Firestore read failed, using localStorage', e);
           return { value: localStorage.getItem(LS_FALLBACK) };
@@ -321,11 +292,6 @@ const FIREBASE_CONFIG = {
       },
       set: async (k, v) => {
         try {
-          // Photos stored inline — cache locally too
-          const recipes = JSON.parse(v);
-          recipes.forEach(r => {
-            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
-          });
           await REF.set({ value: v });
           localStorage.setItem(LS_FALLBACK, v);
         } catch (e) {
@@ -797,23 +763,32 @@ function pickEmoji(btn) { document.querySelectorAll('.emoji-opt').forEach(b=>b.c
 function getEmoji() { const s=document.querySelector('.emoji-opt.selected'); return s?s.textContent.trim():'🍳'; }
 
 // ── PHOTO UPLOAD ──
-let pendingPhoto = null;
+let pendingPhoto = null; // holds a compressed dataURL for preview; uploaded to Storage on save
 
 function compressPhoto(dataUrl) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 300;
+      const MAX = 800;
       let w = img.width, h = img.height;
       if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
       else        { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.65));
+      resolve(canvas.toDataURL('image/jpeg', 0.80));
     };
     img.src = dataUrl;
   });
+}
+
+async function uploadPhoto(recipeId, dataUrl) {
+  if (!window.fbStorage) throw new Error('Firebase Storage not initialized');
+  const res  = await fetch(dataUrl);
+  const blob = await res.blob();
+  const ref  = window.fbStorage.ref(`recipe-photos/${recipeId}`);
+  const snap = await ref.put(blob, { contentType: 'image/jpeg' });
+  return await snap.ref.getDownloadURL();
 }
 
 function setPhotoPreview(dataUrl) {
@@ -876,7 +851,7 @@ function addStepRow(val) {
 function renumberSteps() { document.querySelectorAll('#stepList .step-num').forEach((n,i)=>n.textContent=i+1); }
 function removeStep(btn) { btn.parentElement.remove(); renumberSteps(); }
 
-function saveRecipe() {
+async function saveRecipe() {
   const name = document.getElementById('rName').value.trim();
   if (!name) { document.getElementById('rName').focus(); return; }
 
@@ -888,10 +863,30 @@ function saveRecipe() {
 
   const steps = [...document.querySelectorAll('#stepList .step-text-input')].map(t=>t.value.trim()).filter(Boolean);
   const existing = editingId ? recipes.find(x=>x.id===editingId) : null;
+  const id = editingId || genId();
+
+  // Upload new photo to Firebase Storage; get back a permanent URL
+  let photo = existing?.photo || null;
+  if (pendingPhoto) {
+    if (window.fbStorage) {
+      try {
+        const saveBtn = document.querySelector('#addOverlay .btn-primary');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Uploading…'; }
+        photo = await uploadPhoto(id, pendingPhoto);
+      } catch(e) {
+        console.warn('Storage upload failed:', e);
+        photo = pendingPhoto; // fallback: keep compressed dataURL
+      } finally {
+        const saveBtn = document.querySelector('#addOverlay .btn-primary');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; }
+      }
+    } else {
+      photo = pendingPhoto;
+    }
+  }
 
   const r = {
-    id: editingId||genId(),
-    name,
+    id, name,
     tag: document.getElementById('rTag').value,
     emoji: getEmoji(),
     prep: document.getElementById('rPrep').value.trim(),
@@ -900,7 +895,7 @@ function saveRecipe() {
     servings: document.getElementById('rServings').value.trim(),
     difficulty: document.getElementById('rDiff').value,
     notes: document.getElementById('rNotes').value.trim(),
-    photo: pendingPhoto || existing?.photo || null,
+    photo,
     ingredients, steps,
     favorite: existing?.favorite||false,
     reviews: existing?.reviews||[],
