@@ -286,11 +286,37 @@ const FIREBASE_CONFIG = {
           if (!snap.exists) return { value: null };
           const recipes = JSON.parse(snap.data().value || '[]');
           const cloudPhotos = photoSnap.exists ? photoSnap.data() : {};
-          // Merge photos: prefer cloud (synced across devices), fall back to local cache
+
+          // Merge photos: prefer cloud, fall back to local cache
+          const localOnlyPhotos = {};
           recipes.forEach(r => {
-            r.photo = cloudPhotos[r.id] || localStorage.getItem(PHOTO_PREFIX + r.id) || null;
-            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo); // keep local cache warm
+            const local = localStorage.getItem(PHOTO_PREFIX + r.id);
+            r.photo = cloudPhotos[r.id] || local || null;
+            if (r.photo) localStorage.setItem(PHOTO_PREFIX + r.id, r.photo);
+            // Track photos that exist locally but haven't synced to cloud yet
+            if (local && !cloudPhotos[r.id]) localOnlyPhotos[r.id] = local;
           });
+
+          // Auto-migrate local-only photos to Firestore (runs once per device)
+          if (Object.keys(localOnlyPhotos).length) {
+            (async () => {
+              try {
+                const merged = { ...cloudPhotos };
+                for (const [id, photo] of Object.entries(localOnlyPhotos)) {
+                  // Compress before upload — pre-fix photos may be full-size
+                  const compressed = typeof compressPhoto === 'function'
+                    ? await compressPhoto(photo) : photo;
+                  merged[id] = compressed;
+                  localStorage.setItem(PHOTO_PREFIX + id, compressed);
+                }
+                await PHOTOS_REF.set(merged);
+                console.log(`Migrated ${Object.keys(localOnlyPhotos).length} photo(s) to Firestore.`);
+              } catch (e) {
+                console.warn('Photo migration failed', e);
+              }
+            })();
+          }
+
           return { value: JSON.stringify(recipes) };
         } catch (e) {
           console.warn('Firestore read failed, using localStorage', e);
