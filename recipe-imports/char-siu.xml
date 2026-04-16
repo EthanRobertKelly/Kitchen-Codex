@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<KitchenCodex exported="2026-04-14T00:00:00.000Z">
+  <Recipe id="char-siu-pork-001" name="Char Siu (Chinese BBQ Pork)" tag="savory" emoji="🍖" favorite="false" created="1744588800000">
+    <Meta prep="10 min" cook="50 min" ttc="540" servings="8" difficulty="Medium"/>
+    <Notes>Needs overnight marinade — plan ahead. Keep fat on the pork for flavor. Use a metal rack so heat circulates. Watch closely after basting; it burns fast. Internal temp 145°F.</Notes>
+    <Ingredients>
+      <Ingredient amount="3" unit="lbs" name="boneless pork shoulder/butt, cut into 2–3 inch strips"/>
+      <Ingredient amount="1/4" unit="cup" name="granulated white sugar"/>
+      <Ingredient amount="2" unit="tsp" name="salt"/>
+      <Ingredient amount="1/2" unit="tsp" name="five spice powder"/>
+      <Ingredient amount="1/4" unit="tsp" name="white pepper"/>
+      <Ingredient amount="1/2" unit="tsp" name="sesame oil"/>
+      <Ingredient amount="1" unit="tbsp" name="Shaoxing rice wine"/>
+      <Ingredient amount="1" unit="tbsp" name="soy sauce"/>
+      <Ingredient amount="1" unit="tbsp" name="hoisin sauce"/>
+      <Ingredient amount="2" unit="tsp" name="molasses"/>
+      <Ingredient amount="3" unit="cloves" name="garlic, finely minced"/>
+      <Ingredient amount="1/8" unit="tsp" name="red food coloring (optional)"/>
+      <Ingredient amount="2" unit="tbsp" name="maltose or honey (basting)"/>
+      <Ingredient amount="1" unit="tbsp" name="hot water (basting)"/>
+    </Ingredients>
+    <Steps>
+      <Step order="1">Mix sugar, salt, five spice, white pepper, sesame oil, wine, soy sauce, hoisin, molasses, garlic, and food coloring into a marinade. Reserve 2 tbsp separately.</Step>
+      <Step order="2">Coat pork strips in remaining marinade. Cover and refrigerate overnight (minimum 8 hours).</Step>
+      <Step order="3">Preheat oven to 475°F, rack in upper third. Line a sheet pan with foil, place a metal rack on top. Pour 1½ cups water into the pan below the rack.</Step>
+      <Step order="4">Arrange pork on rack with spacing. Roast 25 minutes at 475°F.</Step>
+      <Step order="5">Reduce oven to 375°F. Flip pork, add water to pan if dry, rotate pan 180°. Roast another 15 minutes.</Step>
+      <Step order="6">Mix reserved marinade with maltose/honey and 1 tbsp hot water for basting sauce.</Step>
+      <Step order="7">Baste pork on both sides. Roast final 10 minutes. Optional: broil briefly for extra char — watch carefully.</Step>
+      <Step order="8">Baste with remaining sauce. Rest 10 minutes before slicing.</Step>
+    </Steps>
+    <Reviews>
+    </Reviews>
+  </Recipe>
+</KitchenCodex>

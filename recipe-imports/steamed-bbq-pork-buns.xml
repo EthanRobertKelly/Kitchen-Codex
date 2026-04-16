@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<KitchenCodex exported="2026-04-14T00:00:00.000Z">
+  <Recipe id="char-siu-bao-001" name="Steamed BBQ Pork Buns (Char Siu Bao)" tag="savory" emoji="🥟" favorite="false" created="1744588800000">
+    <Meta prep="3 hr" cook="12 min" ttc="210" servings="10 buns" difficulty="Weekend Project"/>
+    <Notes>Baking powder goes in after the 2-hour rise, not before. Cornstarch is what gives the buns that pillowy dim sum texture. Steam in batches — don&apos;t let water touch the buns.</Notes>
+    <Ingredients>
+      <Ingredient amount="1" unit="tsp" name="active dry yeast"/>
+      <Ingredient amount="3/4" unit="cup" name="warm water"/>
+      <Ingredient amount="2" unit="cups" name="all-purpose flour"/>
+      <Ingredient amount="1" unit="cup" name="cornstarch"/>
+      <Ingredient amount="5" unit="tbsp" name="sugar"/>
+      <Ingredient amount="1/4" unit="cup" name="canola or vegetable oil"/>
+      <Ingredient amount="2 1/2" unit="tsp" name="baking powder"/>
+      <Ingredient amount="1" unit="tbsp" name="oil (filling)"/>
+      <Ingredient amount="1/3" unit="cup" name="shallots or red onion, finely chopped"/>
+      <Ingredient amount="1" unit="tbsp" name="sugar (filling)"/>
+      <Ingredient amount="1" unit="tbsp" name="light soy sauce"/>
+      <Ingredient amount="1 1/2" unit="tbsp" name="oyster sauce"/>
+      <Ingredient amount="2" unit="tsp" name="sesame oil"/>
+      <Ingredient amount="2" unit="tsp" name="dark soy sauce"/>
+      <Ingredient amount="1/2" unit="cup" name="chicken stock"/>
+      <Ingredient amount="2" unit="tbsp" name="all-purpose flour (filling)"/>
+      <Ingredient amount="1 1/2" unit="cups" name="diced Chinese roast pork (char siu)"/>
+    </Ingredients>
+    <Steps>
+      <Step order="1">Dissolve yeast in warm water. Mix sifted flour and cornstarch with yeast mixture, sugar, and oil using a dough hook. Knead until smooth. Cover and rest 2 hours.</Step>
+      <Step order="2">Make filling: heat oil in wok over medium-high. Stir-fry onion briefly, reduce heat, add sugar, soy sauces, sesame oil. Cook until bubbling. Add stock and flour, stir until thickened. Fold in roast pork. Cool completely.</Step>
+      <Step order="3">Add baking powder to risen dough and knead gently until smooth. Add 1–2 tsp water if needed. Rest 15 minutes. Cut ten 4×4-inch parchment squares. Bring steamer to boil.</Step>
+      <Step order="4">Roll dough into a log and divide into 10 pieces. Press each into a 4½-inch disc — thicker center, thinner edges. Add filling and pleat until sealed on top.</Step>
+      <Step order="5">Place each bun on a parchment square. Steam in two batches, 12 minutes each over high heat.</Step>
+    </Steps>
+    <Reviews>
+    </Reviews>
+  </Recipe>
+</KitchenCodex>
