@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<KitchenCodex exported="2026-04-15T00:00:00.000Z">
+  <Recipe id="banana-bread-001" name="Banana Bread" tag="bread" emoji="🍌" favorite="false" created="1744675200000">
+    <Meta prep="15 min" cook="45 min" ttc="60" servings="1 large loaf" difficulty="Easy"/>
+    <Notes>Old family recipe — &quot;Pot Luck&quot; card. Dissolve the soda in boiling water before adding; don&apos;t skip this step. Riper the bananas, the better. Walnuts are optional but worth it.</Notes>
+    <Ingredients>
+      <Ingredient amount="1/2" unit="cup" name="margarine (or butter)"/>
+      <Ingredient amount="1/2" unit="cup" name="sugar"/>
+      <Ingredient amount="1/2" unit="cup" name="brown sugar"/>
+      <Ingredient amount="2" unit="" name="eggs, beaten"/>
+      <Ingredient amount="1/4" unit="cup" name="milk"/>
+      <Ingredient amount="1/2" unit="tsp" name="vanilla"/>
+      <Ingredient amount="1/2" unit="tsp" name="baking soda"/>
+      <Ingredient amount="1/4" unit="cup" name="boiling water"/>
+      <Ingredient amount="2" unit="cups" name="all-purpose flour"/>
+      <Ingredient amount="1 1/2" unit="tsp" name="baking powder"/>
+      <Ingredient amount="1/2" unit="tsp" name="salt"/>
+      <Ingredient amount="1" unit="cup" name="mashed ripe bananas (about 2-3)"/>
+      <Ingredient amount="1/2" unit="cup" name="walnuts, chopped"/>
+    </Ingredients>
+    <Steps>
+      <Step order="1">Preheat oven to 350°F. Grease a large loaf pan.</Step>
+      <Step order="2">Beat margarine with both sugars until combined. Add beaten eggs and mix well.</Step>
+      <Step order="3">Add milk and vanilla. Stir to combine.</Step>
+      <Step order="4">Dissolve baking soda in boiling water, then stir into the batter.</Step>
+      <Step order="5">Add flour, baking powder, and salt. Mix until just combined — don&apos;t overmix.</Step>
+      <Step order="6">Fold in mashed bananas and walnuts.</Step>
+      <Step order="7">Pour into prepared loaf pan. Bake at 350°F for 40–50 minutes, until a toothpick inserted in the center comes out clean.</Step>
+    </Steps>
+    <Reviews>
+    </Reviews>
+  </Recipe>
+</KitchenCodex>
