@@ -237,74 +237,9 @@ main { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem; }
   .ingredient-row { grid-template-columns: 22px 60px 55px 1fr 24px; }
 }
 </style>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script>
-// ── PASTE YOUR FIREBASE CONFIG HERE ─────────────────────────────────────────
-// 1. Go to https://console.firebase.google.com → New project
-// 2. Add a web app → copy the firebaseConfig object → paste it below
-// 3. In the Firebase console: Firestore Database → Create database → Start in test mode
-// ─────────────────────────────────────────────────────────────────────────────
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCCCgLA1g50-qA3ThHVtCzMcZBmttXV0bc",
-  authDomain: "ek-kitchencodex-6301d.firebaseapp.com",
-  projectId: "ek-kitchencodex-6301d",
-  storageBucket: "ek-kitchencodex-6301d.firebasestorage.app",
-  messagingSenderId: "789808351695",
-  appId: "1:789808351695:web:59bac9576e22fddb136aba"
-};
-// ─────────────────────────────────────────────────────────────────────────────
-
-(function () {
-  const LS_FALLBACK = 'recipes';
-
-  function lsFallback() {
-    return {
-      get: (k) => Promise.resolve({ value: localStorage.getItem(k) }),
-      set: (k, v) => { localStorage.setItem(k, v); return Promise.resolve(); }
-    };
-  }
-
-  if (!FIREBASE_CONFIG) {
-    window.storage = lsFallback();
-    return;
-  }
-
-  try {
-    firebase.initializeApp(FIREBASE_CONFIG);
-    const db = firebase.firestore();
-    window.db = db;
-    window.fbStorage = firebase.storage();
-    const REF = db.collection('kitchen').doc('recipes');
-
-    window.storage = {
-      get: async (k) => {
-        try {
-          const snap = await REF.get();
-          if (!snap.exists) return { value: null };
-          return { value: snap.data().value || '[]' };
-        } catch (e) {
-          console.warn('Firestore read failed, using localStorage', e);
-          return { value: localStorage.getItem(LS_FALLBACK) };
-        }
-      },
-      set: async (k, v) => {
-        try {
-          await REF.set({ value: v });
-          localStorage.setItem(LS_FALLBACK, v);
-        } catch (e) {
-          console.warn('Firestore write failed, saving to localStorage only', e);
-          localStorage.setItem(LS_FALLBACK, v);
-        }
-      }
-    };
-  } catch (e) {
-    console.warn('Firebase init failed, using localStorage', e);
-    window.storage = lsFallback();
-  }
-})();
+// GitHub image hosting — images live in /images/ in the repo
+const GITHUB_IMAGES_BASE = 'https://raw.githubusercontent.com/EthanRobertKelly/Kitchen-Codex/main/images/';
 </script>
 </head>
 <body>
@@ -317,6 +252,7 @@ const FIREBASE_CONFIG = {
     <button id="ownerLogoutBtn" class="btn btn-ghost" style="display:none;font-size:12px;padding:0.35rem 0.7rem" onclick="ownerLogout()">Logout</button>
     <button id="btnImport" class="btn btn-ghost" onclick="openImport()" style="display:none">↑ Import</button>
     <button id="btnExport" class="btn btn-ghost" onclick="openExport()" style="display:none">↓ Export</button>
+    <button id="btnSaveJson" class="btn btn-ghost" onclick="saveJsonFile()" style="display:none;font-size:12px" title="Download recipes.json to commit and push">↓ Save to File</button>
     <button id="btnAddRecipe" class="btn btn-primary" onclick="openAdd()" style="display:none">+ Add Recipe</button>
     <button id="btnSuggest" class="btn btn-ghost" onclick="openSuggest()" style="display:none">✦ Suggest a Recipe</button>
     <button class="btn btn-ghost" style="font-size:12px;padding:0.35rem 0.7rem" onclick="openOwnerModal()">Login</button>
@@ -594,12 +530,37 @@ let importedRecipes = [];
 let importMergeMode = 'merge';
 
 async function loadData() {
-  try { const r = await window.storage.get('recipes'); if (r?.value) recipes = JSON.parse(r.value); }
-  catch(e) { recipes = []; }
+  try {
+    const saved = localStorage.getItem('ek-recipes');
+    if (saved) {
+      recipes = JSON.parse(saved);
+    } else {
+      // First load — pull from the committed recipes.json in the repo
+      const res = await fetch('./recipes.json');
+      if (res.ok) {
+        recipes = await res.json();
+        localStorage.setItem('ek-recipes', JSON.stringify(recipes));
+      }
+    }
+  } catch(e) { recipes = []; }
   renderFavorites(); renderFilters(); renderGrid();
   loadSuggestions();
 }
-async function saveData() { await window.storage.set('recipes', JSON.stringify(recipes)); }
+
+function saveData() {
+  localStorage.setItem('ek-recipes', JSON.stringify(recipes));
+}
+
+// Download the current recipes as recipes.json so you can commit and push it.
+function saveJsonFile() {
+  const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'recipes.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showPhotoToast('recipes.json', 'Recipe data downloaded — replace recipes.json in the repo and push:\n\ngit add recipes.json\ngit commit -m "update recipes"\ngit push');
+}
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 // ── FAVORITES ──
@@ -782,13 +743,49 @@ function compressPhoto(dataUrl) {
   });
 }
 
+// Saves image to GitHub: downloads the file locally so you can git push it,
+// and returns the raw.githubusercontent.com URL that will serve it permanently.
 async function uploadPhoto(recipeId, dataUrl) {
-  if (!window.fbStorage) throw new Error('Firebase Storage not initialized');
+  const filename = `${recipeId}.jpg`;
+  const url = GITHUB_IMAGES_BASE + filename;
+
+  // Trigger browser download of the compressed image
   const res  = await fetch(dataUrl);
   const blob = await res.blob();
-  const ref  = window.fbStorage.ref(`recipe-photos/${recipeId}`);
-  const snap = await ref.put(blob, { contentType: 'image/jpeg' });
-  return await snap.ref.getDownloadURL();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // Show git instructions
+  showPhotoToast(filename);
+
+  return url;
+}
+
+function showPhotoToast(filename, customMsg) {
+  document.getElementById('photoToast')?.remove();
+  const t = document.createElement('div');
+  t.id = 'photoToast';
+  t.style.cssText = `
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#2c1f0e; color:#faf6f0; border-radius:10px;
+    padding:14px 20px; font-size:13px; line-height:1.6; z-index:9999;
+    box-shadow:0 8px 32px rgba(0,0,0,0.35); max-width:480px; width:90%;
+    border:1px solid #8b6f47;
+  `;
+  const msg = customMsg || `mv ~/Downloads/${filename} images/\ngit add images/${filename}\ngit commit -m "add photo: ${filename}"\ngit push`;
+  const title = customMsg ? '💾 File downloaded — push to GitHub:' : '📸 Photo downloaded — push to GitHub:';
+  t.innerHTML = `
+    <div style="font-weight:600;margin-bottom:6px;">${title}</div>
+    <code style="display:block;background:#1a1008;padding:8px 10px;border-radius:6px;font-size:11.5px;white-space:pre;overflow-x:auto;">${msg}</code>
+    <button onclick="this.parentElement.remove()" style="
+      position:absolute;top:8px;right:10px;background:none;border:none;
+      color:#9b8b78;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+  `;
+  document.body.appendChild(t);
+  setTimeout(() => t?.remove(), 40000);
 }
 
 function setPhotoPreview(dataUrl) {
@@ -865,24 +862,10 @@ async function saveRecipe() {
   const existing = editingId ? recipes.find(x=>x.id===editingId) : null;
   const id = editingId || genId();
 
-  // Upload new photo to Firebase Storage; get back a permanent URL
+  // Download image file + store raw.githubusercontent.com URL for GitHub hosting
   let photo = existing?.photo || null;
   if (pendingPhoto) {
-    if (window.fbStorage) {
-      try {
-        const saveBtn = document.querySelector('#addOverlay .btn-primary');
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Uploading…'; }
-        photo = await uploadPhoto(id, pendingPhoto);
-      } catch(e) {
-        console.warn('Storage upload failed:', e);
-        photo = pendingPhoto; // fallback: keep compressed dataURL
-      } finally {
-        const saveBtn = document.querySelector('#addOverlay .btn-primary');
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Recipe'; }
-      }
-    } else {
-      photo = pendingPhoto;
-    }
+    photo = await uploadPhoto(id, pendingPhoto);
   }
 
   const r = {
@@ -1249,6 +1232,7 @@ function applyOwnerMode() {
   const owner = isOwner();
   document.getElementById('btnImport').style.display = owner ? '' : 'none';
   document.getElementById('btnExport').style.display = owner ? '' : 'none';
+  document.getElementById('btnSaveJson').style.display = owner ? '' : 'none';
   document.getElementById('btnAddRecipe').style.display = owner ? '' : 'none';
   document.getElementById('btnSuggest').style.display = owner ? 'none' : '';
   document.getElementById('ownerIndicator').style.display = owner ? '' : 'none';
